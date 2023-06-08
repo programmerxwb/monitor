@@ -2,6 +2,7 @@ package file
 
 import (
 	"encoding/json"
+	"github.com/shirou/gopsutil/cpu"
 	entity "monitor/app/domain/entity"
 	"monitor/app/infrastructure/cache"
 	socket "monitor/app/infrastructure/websocket"
@@ -15,10 +16,17 @@ type ServerRepository struct {
 const dataName = "a.text"
 
 func (m *ServerRepository) Inspect() {
-	go doInspect()
+	go inspectServer()
+	go inspectCpu()
 }
 
-func doInspect() {
+func inspectCpu() {
+	for {
+		cpuPercent, _ := cpu.Percent(time.Second, false)
+		socket.SendAll("cpu", cpuPercent[0])
+	}
+}
+func inspectServer() {
 	for {
 		value := cache.GetCache("servers")
 		var servers []*entity.Server
@@ -30,8 +38,7 @@ func doInspect() {
 				}
 			}
 		}
-		marshal, _ := json.Marshal(servers)
-		socket.SendAll(marshal)
+		socket.SendAll("servers", servers)
 		time.Sleep(time.Second * 10)
 	}
 }

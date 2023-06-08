@@ -1,1 +1,1 @@
-[{"port":6379,"name":"redis","status":""},{"port":3306,"name":"mysql","status":""}]
+[{"port":3306,"name":"mysql","status":""},{"port":6379,"name":"redis","status":""}]

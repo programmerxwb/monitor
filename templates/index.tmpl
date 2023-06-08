@@ -3,55 +3,50 @@
 <head>
   <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
   <meta charset="UTF-8">
-  <title>Title</title>
+  <title>wb-monitor</title>
 </head>
 <body>
 <div id="app">
-<el-table
-      :data="tableData"
-      style="width: 100%">
-      <el-table-column
-        prop="name"
-        label="应用名称">
-      </el-table-column>
-       <el-table-column
-          prop="port"
-          label="端口">
-        </el-table-column>
-      <el-table-column
-        prop="status"
-        label="状态">
-      </el-table-column>
-      <el-table-column
-            fixed="right"
-            label="操作"
-            width="100">
-            <template slot-scope="scope">
-              <el-button type="danger" size="small" @click="del(scope.row)" >删除</el-button>
-            </template>
-          </el-table-column>
-    </el-table>
-    <el-button type="success" size="small" @click="dialogFormVisible = true">添加服务监控</el-button>
-    <el-dialog title="新增监控服务" :visible.sync="dialogFormVisible">
-      <el-form :model="form">
-        <el-form-item label="服务名称" :label-width="formLabelWidth">
-          <el-input v-model="form.name" autocomplete="off"></el-input>
-        </el-form-item>
-        <el-form-item label="服务端口" :label-width="formLabelWidth">
-          <el-input v-model.number="form.port" autocomplete="off"></el-input>
-        </el-form-item>
-      </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="saveServer">确 定</el-button>
-      </div>
-    </el-dialog>
+<el-row>
+  <el-col :xs="24" :sm="24" :md="12" :lg="12" :xl="12">
+    <div style="width: 100%; height: 400px;">
+        <el-table :data="tableData" style="width: 100%">
+              <el-table-column prop="name" label="应用名称"> </el-table-column>
+              <el-table-column prop="port" label="端口"></el-table-column>
+              <el-table-column prop="status" label="状态"></el-table-column>
+              <el-table-column fixed="right" label="操作" width="100">
+                    <template slot-scope="scope">
+                      <el-button type="danger" size="small" @click="del(scope.row)" >删除</el-button>
+                    </template>
+                  </el-table-column>
+            </el-table>
+            <el-button type="success" size="small" @click="dialogFormVisible = true">添加服务监控</el-button>
+            <el-dialog title="新增监控服务" :visible.sync="dialogFormVisible">
+              <el-form :model="form">
+                <el-form-item label="服务名称" :label-width="formLabelWidth">
+                  <el-input v-model="form.name" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="服务端口" :label-width="formLabelWidth">
+                  <el-input v-model.number="form.port" autocomplete="off"></el-input>
+                </el-form-item>
+              </el-form>
+              <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogFormVisible = false">取 消</el-button>
+                <el-button type="primary" @click="saveServer">确 定</el-button>
+              </div>
+            </el-dialog>
+    </div>
+    </el-col>
+      <el-col :xs="24" :sm="24" :md="12" :lg="12" :xl="12">
+        <div id ="chartContainer" style="width: 100%; height: 400px;"></div>
+      </el-col>
+    </el-row>
 </div>
 </body>
 <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
 <script src="https://unpkg.com/element-ui/lib/index.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-
+<script src='https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.2/echarts.min.js'></script>
 <script>
     const instance = axios.create({
       baseURL: window.location.origin,
@@ -61,7 +56,9 @@
     el: '#app',
     data: {
        tableData: [],
+       cpuUsage: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
        dialogFormVisible:false,
+       chartContainer: null,
        form: {
              name: '',
              port: ''
@@ -72,10 +69,20 @@
     window.mysocket = new WebSocket('ws://' + window.location.host + '/websocket');
     window.mysocket.addEventListener('message', this.messageListener)
     this.getServer()
+    this.initChart()
     },
     methods: {
         messageListener: function(event){
-            this.tableData = JSON.parse(event.data)
+            var data = JSON.parse(event.data)
+            if ("servers" === data.type) {
+                this.tableData = data.data
+            }
+            if ("cpu" === data.type) {
+                this.cpuUsage.shift()
+                this.cpuUsage.push(data.data)
+                this.initChart()
+            }
+
         },
         getServer: function() {
             var _this = this
@@ -102,7 +109,7 @@
                  .catch(function (error) {
                    console.log(error);
                  })
-      },
+        },
         del: function (row) {
         var _this = this
             instance.delete('/server', {data:{"port":row.port}})
@@ -117,7 +124,55 @@
                    .catch(function (error) {
                      console.log(error);
                    });
-        }
+        },
+        initChart: function() {
+        var _this = this
+             option = {
+              title: {
+                left: 'center',
+                text: 'CPU使用率'
+              },
+              tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                  type: 'cross',
+                  label: {
+                    backgroundColor: '#6a7985'
+                  }
+                }
+              },
+              xAxis: [
+                {
+                  type: 'category',
+                  show: false
+                }
+              ],
+              yAxis: [
+                {
+                  max: 100,
+                  type: 'value'
+                }
+              ],
+              series: [
+                {
+                  type: 'line',
+                  stack: 'Total',
+                  smooth: true,
+                  lineStyle: {
+                    width: 0
+                  },
+                  showSymbol: false,
+                  areaStyle: {},
+                  emphasis: {
+                    focus: 'series'
+                  },
+                  data: _this.cpuUsage
+                }
+              ]
+            };
+            _this.chartContainer = echarts.init(document.getElementById('chartContainer'));
+            _this.chartContainer.setOption(option);
+            }
       }
   })
 </script>
